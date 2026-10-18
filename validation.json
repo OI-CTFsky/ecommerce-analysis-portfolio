@@ -1,0 +1,21 @@
+{
+  "synthetic": true,
+  "funnel_users": 6000,
+  "raw_events": 32626,
+  "clean_events": 32576,
+  "paid_users": 1528,
+  "members": 1765,
+  "orders": 4222,
+  "thresholds": {
+    "r50": 41,
+    "f75": 2,
+    "m75": 82700,
+    "excluded": 35
+  },
+  "paid_items": 4949,
+  "paid_orders": 4000,
+  "requested_items": 747,
+  "successful_items": 637,
+  "paid_cents": 97882360,
+  "refund_cents": 11907455
+}
