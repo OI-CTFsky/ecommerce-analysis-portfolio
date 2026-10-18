@@ -19,7 +19,8 @@ function render(){
   selected=D[kind].filter(x=>x[field]>=from&&x[field]<=to&&inputIds.every(id=>!$(id).value||x[id]===$(id).value));page=0;query='';
   if(!selected.length){$('dynamic').innerHTML='<div class="empty">当前条件下没有样本，请调整筛选。</div>';csvRows=[];return;}
   let out=kind==='funnel'?funnel(selected):kind==='members'?members(selected):refunds(selected);
-  $('dynamic').innerHTML=`<p><span class="tag">模拟样本</span> 当前 ${N(selected.length)} ${kind==='refunds'?'支付商品行':'位用户'} · ${from}—${to}</p>`+out+panel(kind==='refunds'?'支付商品行明细':'匿名样本明细',`<label>按匿名编号搜索<input type="search" id="row-search" placeholder="${kind==='funnel'?'例如 F00001':kind==='members'?'例如 M00001':'例如 RO00001'}"></label><div id="sample-table"></div><div class="pager"><button id="prev">上一页</button><span id="page-label"></span><button id="next">下一页</button></div>`)+`<section id="detail"></section>`;
+  $('dynamic').innerHTML=`<p>当前 ${N(selected.length)} ${kind==='refunds'?'支付商品行':'位用户'} · ${from}—${to}</p>`+out+panel(kind==='refunds'?'支付商品行明细':'匿名样本明细',`<label>按匿名编号搜索<input type="search" id="row-search" placeholder="${kind==='funnel'?'例如 F00001':kind==='members'?'例如 M00001':'例如 RO00001'}"></label><div id="sample-table"></div><div class="pager"><button id="prev">上一页</button><span id="page-label"></span><button id="next">下一页</button></div>`)+`<section id="detail"></section>`;
+  document.querySelectorAll('.viz-point').forEach(el=>el.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();drill(el.dataset.id);}});
   $('row-search').addEventListener('input',e=>{query=e.target.value.trim().toUpperCase();page=0;rows();});
   $('prev').onclick=()=>{page--;rows();};$('next').onclick=()=>{page++;rows();};rows();
   document.querySelectorAll('[data-filter]').forEach(el=>el.onclick=()=>{$(kind==='funnel'?'channel':kind==='members'?'segment':'product').value=el.dataset.filter;render();});
@@ -27,10 +28,12 @@ function render(){
 function funnel(a){
   const counts=[a.length,S(a,'cart'),S(a,'order'),S(a,'pay')],labels=['首访浏览','加购','下单','支付'];
   let out=cards([['首访用户',N(a.length),'首访渠道固定归属'],['7天支付用户',N(counts[3]),'完整有序链路'],['首访→支付',P(counts[3],a.length),'整体转化率'],['支付客单价',counts[3]?M(S(a,'amount')/counts[3]):'—','元 / 订单；一位用户最多一单']]);
-  out+=panel('7天有序转化漏斗',bars(counts.map((v,i)=>[labels[i],v,i?'相邻转化 '+P(v,counts[i-1]):'起点 100%']),a.length), '每位用户每步最多计1次；先浏览，再加购、下单、支付。首访日到第7日结束，包含跨日行为。');
+  out+=panel('7天有序转化漏斗',Viz.funnel(labels,counts), '每位用户每步最多计1次；先浏览，再加购、下单、支付。首访日到第7日结束，包含跨日行为。');
   const cr=groups(a,'channel').map(([ch,r])=>{const p=S(r,'pay');return [ch,r.length,S(r,'cart'),S(r,'order'),p];});
   csvRows=cr.map(([ch,v,c,o,p])=>({首访渠道:ch,首访UV:v,加购UV:c,下单UV:o,支付UV:p,整体转化率:P(p,v),支付率95区间:ci(p,v)}));
   out+=panel('渠道比较 / 点击渠道下钻',table(['首访渠道','首访UV','加购UV','下单UV','支付UV','首访→支付','Wilson 95%区间'],cr.map(([ch,v,c,o,p])=>[`<button class="drill" data-filter="${E(ch)}">${E(ch)}</button>`,N(v),N(c),N(o),N(p),P(p,v),ci(p,v)])),'区间刻画二项比例抽样不确定性；模拟渠道设定与人群结构仍会影响结果。');
+  const months=[...new Set(a.map(x=>x.month))].sort();
+  out+=panel('首访渠道 / 月度支付转化趋势',Viz.lines(months.map(m=>m.slice(5)),groups(a,'channel').map(([name,r])=>({name,values:months.map(m=>{const v=r.filter(x=>x.month===m);return v.length?S(v,'pay')/v.length*100:null;})}))), '每个点按当月首访用户计算7天有序支付率；鼠标停留可读数。');
   const cohorts=groups(a,'month').sort().map(([m,r])=>[m,N(r.length),...[1,7,30].map(k=>{const elig=r.filter(x=>day(x.cohort,k)<=D.meta.funnel_asof);return heat(elig.filter(x=>x.active.includes(day(x.cohort,k))).length,elig.length);})]);
   out+=panel('首访队列 / 当天访问留存',table(['首访月份','用户数','D1','D7','D30'],cohorts),'格内为百分比（回访用户/可观察用户）；只统计第k天的view/visit访问，不是k天内累计回访。观察截止2025-07-31，当前所有首访用户窗口完整。');
   return out;
@@ -41,7 +44,9 @@ function members(a){
   const gs=groups(a,'segment').sort((a,b)=>b[1].length-a[1].length);
   const rr=gs.map(([s,r])=>[s,r.length,S(r,'f'),S(r,'m'),S(r,'next'),S(r,'next_net')]);
   csvRows=rr.map(([s,num,f,m,next,v])=>({快照标签:s,会员数:num,历史有效订单:f,历史净销售元:(m/100).toFixed(2),次月再购会员:next,次月再购率:P(next,num),次月净销售元:(v/100).toFixed(2)}));
-  out+=panel('快照分层结构',bars(gs.map(([s,r])=>[s,r.length,'点击查看本层',s]),Math.max(...gs.map(x=>x[1].length))),`阈值固定：R中位数${th.r50}天，F75分位${th.f75}单，M75分位${M(th.m75)}元；匹配优先级见报告。`);
+  out+=panel('快照会员分层 / 人数构成',Viz.donut(gs.map(([name,r])=>({name,value:r.length}))),`阈值固定：R中位数${th.r50}天，F75分位${th.f75}单，M75分位${M(th.m75)}元；匹配优先级见报告。`);
+  out+=panel('RFM 分布 / 点击散点打开会员档案',Viz.scatter(a));
+  out+=panel('各层次月再购率',bars(gs.map(([s,r])=>[s,S(r,'next')/r.length*100,`${r.length}位快照会员`,s]),100,'%'),'点击层级可筛选；后续验证窗口固定为7月。');
   out+=panel('后续验证 / 次月再购和净销售',table(['标签','会员数','历史净销售/元','次月再购率','再购率95%区间','次月客均净销售/元'],rr.map(([s,num,f,m,next,v])=>[`<button class="drill" data-filter="${E(s)}">${E(s)}</button>`,N(num),M(m),P(next,num),ci(next,num),M(v/num)])),'同一会员可能在7月购买多单，但再购人数只计1次。分层差异不是触达增量效果，客均净销售也不是利润LTV。');
   const cohort=groups(a,'month').sort().map(([mo,r])=>[mo,N(r.length),...[30,60].map(k=>{const elig=r.filter(x=>day(x.first,k)<=D.meta.funnel_asof);const yes=elig.filter(x=>x.purchases.some(d=>d>x.first&&d<=day(x.first,k))).length;return heat(yes,elig.length);})]);
   out+=panel('样本内首购队列 / 30与60天内二购',table(['首购月份','快照会员数','D30累计二购','D60累计二购'],cohort),'每格只纳入截至7月31日已完整观察该窗口的会员，显示（已二购/成熟会员）。二购为首购后另一自然日的有效购买；同日多单不算本队列二购，RFM的F仍按去重订单。');
@@ -52,9 +57,12 @@ function refunds(a){
   let out=cards([['商品行申请率',P(req,a.length),`${N(req)} / ${N(a.length)} 支付商品行`],['商品行成功退款率',P(ok,a.length),`${N(ok)} 行退款成功`],['退款金额率',P(ref,paid),`${M(ref)} / ${M(paid)} 元`],['范围内订单申请率',P(rqorders,orders),`${N(rqorders)} / ${N(orders)} 笔订单`]]);
   const gs=groups(a,'product'),pr=gs.map(([p,r])=>[p,r.length,S(r,'apply'),r.filter(x=>x.status==='退款成功').length,S(r,'refund'),S(r,'paid')]).sort((x,y)=>y[4]-x[4]);
   csvRows=pr.map(([p,num,r,ok,rf,pd])=>({商品:p,支付商品行:num,申请商品行:r,成功商品行:ok,申请率:P(r,num),成功退款率:P(ok,num),支付金额元:(pd/100).toFixed(2),退款金额元:(rf/100).toFixed(2),退款金额率:P(rf,pd)}));
+  out+=panel('商品售后比例 / 申请与成功分开看',Viz.compare(pr.map(([name,num,req,ok])=>({name,a:req/num*100,b:ok/num*100}))), '两个比例均以相同成熟支付商品行为分母。');
+  const weeks=groups(a.map(x=>({...x,week:day('2025-06-01',Math.floor(age('2025-06-01',x.day)/7)*7)})),'week').sort();
+  out+=panel('支付批次 / 每周申请与退款金额率',Viz.lines(weeks.map(([w])=>w.slice(5)),[{name:'申请率',values:weeks.map(([,r])=>S(r,'apply')/r.length*100)},{name:'退款金额率',values:weeks.map(([,r])=>S(r,'refund')/S(r,'paid')*100)}]), '按支付周分组，均有完整30天申请观察窗口；最后一周可能不足7天，样本规模需结合明细核查。');
   out+=panel('商品对比 / 先核查比例与金额的组合',table(['商品','支付商品行','申请率','成功退款率','申请率95%区间','成功退款额/元','金额率'],pr.map(([p,num,r,ok,rf,pd])=>[`<button class="drill" data-filter="${E(p)}">${E(p)}</button>`,N(num),P(r,num),P(ok,num),ci(r,num),M(rf),P(rf,pd)])),'订单指标仅覆盖筛选命中的商品行：同订单的其他未命中商品不进入本范围。商品行概率相关性可能使普通二项区间偏窄，区间仅作描述。');
   const reasons=groups(a.filter(x=>x.apply),'category').sort((x,y)=>y[1].length-x[1].length);
-  out+=panel('申请原因构成 / 分母为申请商品行',bars(reasons.map(([c,r])=>[c,r.length,`占申请 ${P(r.length,req)}`]),Math.max(1,...reasons.map(x=>x[1].length))),'来自模拟用户填报的单一主理由；分类是归因线索，不等于已证实原因。');
+  out+=panel('申请原因构成 / 分母为申请商品行',Viz.donut(reasons.map(([name,r])=>({name,value:r.length}))),'来自模拟用户填报的单一主理由；分类是归因线索，不等于已证实原因。');
   out+=panel('尺码与处理状态',table(['尺码','支付商品行','申请商品行','申请率','退款金额/元'],groups(a,'size').sort().map(([s,r])=>[s,N(r.length),N(S(r,'apply')),P(S(r,'apply'),r.length),M(S(r,'refund'))]))+table(['最新状态','商品行数','占申请'],['退款成功','申请关闭','处理中'].map(s=>[s,N(a.filter(x=>x.status===s).length),P(a.filter(x=>x.status===s).length,req)])),`申请转成功率 ${P(ok,req)}；成功退款平均耗时 ${ok?(S(a.filter(x=>x.status==='退款成功'),'days')/ok).toFixed(1):'—'} 天。未完成申请不进入完成时长均值；快照为2025-08-31。`);
   return out;
 }

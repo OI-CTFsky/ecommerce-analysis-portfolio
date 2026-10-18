@@ -1,6 +1,6 @@
 # 电商数据分析作品集
 
-面向业务问题的案例报告与交互看板，包含三个独立的**模拟数据演示**，并链接既有达人种草分析案例。
+四个业务分析案例采用统一导航、报告入口、交互看板与指标附录。
 
 **[在线作品集](https://oi-ctfsky.github.io/ecommerce-analysis-portfolio/)**
 
@@ -9,7 +9,7 @@
 | 用户转化漏斗与留存 | 7天有序用户漏斗、首访队列、D1/D7/D30访问留存 | [查看](https://oi-ctfsky.github.io/ecommerce-analysis-portfolio/funnel.html) |
 | 会员复购与价值分层 | 快照RFM、互斥分层、独立次月再购、成熟首购队列 | [查看](https://oi-ctfsky.github.io/ecommerce-analysis-portfolio/members.html) |
 | 退货退款归因与经营改善 | 售后状态去重、商品行分母、退款金额、商品与尺码下钻 | [查看](https://oi-ctfsky.github.io/ecommerce-analysis-portfolio/refunds.html) |
-| 既有达人种草分析 | 21天观察窗口、达人筛选、内容双效矩阵 | [独立项目](https://oi-ctfsky.github.io/outdoor-seeding-analysis/) |
+| 既有达人种草分析 | 21天观察窗口、达人筛选、内容双效矩阵 | [独立项目](https://oi-ctfsky.github.io/ecommerce-analysis-portfolio/seeding.html) |
 
 ## 数据与结论
 
@@ -33,3 +33,8 @@ python verify.py
 静态HTML/CSS/JavaScript，无构建步骤和外部依赖。打开`index.html`，或在本目录运行`python -m http.server 8000`后访问本地地址。可通过GitHub Pages从main分支根目录发布。
 
 每页支持日期与业务维度筛选、匿名样本下钻、当前汇总CSV导出、打印/保存PDF。报告文字为全样本基线；下方看板随筛选变化。
+
+
+## 统一导航与图表
+
+四个项目均提供“案例报告 / 交互看板 / 指标口径 / 作品集首页 / 打印保存PDF”。达人种草另设经营复盘。转化看板使用漏斗与渠道趋势，会员看板使用分层环图、RFM散点和队列热力表，退款看板使用商品双指标对比、支付周趋势和原因环图；所有汇总随筛选联动。
